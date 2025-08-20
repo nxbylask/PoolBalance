@@ -180,7 +180,7 @@ const Header = ({ currentView, setCurrentView }) => {
   );
 };
 
-const HomeView = ({ pools, selectedPool, setSelectedPool, setCurrentView }) => {
+const HomeView = ({ pools, selectedPool, setSelectedPool, setCurrentView, onDeletePool, loading }) => {
   return (
     <div className="space-y-8">
       <div className="text-center">
@@ -215,17 +215,34 @@ const HomeView = ({ pools, selectedPool, setSelectedPool, setCurrentView }) => {
               {pools.map((pool) => (
                 <div
                   key={pool.id}
-                  className={`p-4 rounded-md border-2 cursor-pointer transition-colors ${
+                  className={`p-4 rounded-md border-2 transition-colors ${
                     selectedPool?.id === pool.id
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-blue-300'
                   }`}
-                  onClick={() => setSelectedPool(pool)}
                 >
-                  <h4 className="font-semibold">{pool.name}</h4>
-                  <p className="text-sm text-gray-600">
-                    {pool.volume_liters.toLocaleString()} L ({pool.volume_gallons.toLocaleString()} gal)
-                  </p>
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => setSelectedPool(pool)}
+                  >
+                    <h4 className="font-semibold">{pool.name}</h4>
+                    <p className="text-sm text-gray-600">
+                      {pool.volume_liters.toLocaleString()} L ({pool.volume_gallons.toLocaleString()} gal)
+                    </p>
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation(); // Evitar que se seleccione la piscina al hacer clic en eliminar
+                        onDeletePool(pool.id);
+                      }}
+                      disabled={loading}
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-md transition-colors disabled:opacity-50"
+                      title="Eliminar piscina"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
