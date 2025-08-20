@@ -101,6 +101,8 @@ function App() {
             selectedPool={selectedPool}
             setSelectedPool={setSelectedPool}
             setCurrentView={setCurrentView}
+            onDeletePool={deletePool}
+            loading={loading}
           />
         )}
         {currentView === 'add-pool' && (
