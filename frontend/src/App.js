@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 import axios from "axios";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import TabsDemo from "./TabsDemo";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -11,6 +12,11 @@ function App() {
   const [pools, setPools] = useState([]);
   const [selectedPool, setSelectedPool] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Show demo if URL contains 'demo'
+  if (window.location.search.includes('demo')) {
+    return <TabsDemo />;
+  }
 
   useEffect(() => {
     loadPools();
