@@ -196,3 +196,5 @@ test_plan:
 agent_communication:
     - agent: "main"
       message: "Successfully implemented tabs functionality for PoolBalance application. Replaced basic template with full application from GitHub repo and added tabbed interface to separate 'subir' and 'bajar' actions in pH Calculator and Cyanuric Acid Calculator. User request fulfilled - tabs now divide parameter increase/decrease actions instead of having them mixed in same selector."
+    - agent: "main"  
+      message: "Added complete backend API with all necessary endpoints for pools management and chemical calculations. Implemented DELETE /pools/{pool_id} endpoint and corresponding frontend delete functionality with confirmation dialog. Users can now add, view, and remove pools with proper confirmation to prevent accidental deletions."
