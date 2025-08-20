@@ -87,6 +87,18 @@ async def get_pool(pool_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@api_router.delete("/pools/{pool_id}")
+async def delete_pool(pool_id: str):
+    try:
+        result = await db.pools.delete_one({"id": pool_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Pool not found")
+        return {"message": "Pool deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # Chemical calculation endpoints
 @api_router.post("/calculate", response_model=CalculationResult)
 async def calculate_chemical(request: CalculationRequest):
