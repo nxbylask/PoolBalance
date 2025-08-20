@@ -48,6 +48,33 @@ function App() {
     }
   };
 
+  const deletePool = async (poolId) => {
+    // Confirmar antes de eliminar
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta piscina? Esta acción no se puede deshacer.')) {
+      try {
+        setLoading(true);
+        await axios.delete(`${API}/pools/${poolId}`);
+        await loadPools();
+        
+        // Si la piscina eliminada era la seleccionada, seleccionar otra o ninguna
+        if (selectedPool && selectedPool.id === poolId) {
+          const updatedPools = pools.filter(p => p.id !== poolId);
+          setSelectedPool(updatedPools.length > 0 ? updatedPools[0] : null);
+        }
+        
+        // Si no quedan piscinas, volver al home
+        if (pools.filter(p => p.id !== poolId).length === 0) {
+          setCurrentView('home');
+        }
+      } catch (error) {
+        console.error('Error deleting pool:', error);
+        alert('Error al eliminar la piscina. Por favor, intenta de nuevo.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const calculateChemical = async (calculationData) => {
     try {
       setLoading(true);
