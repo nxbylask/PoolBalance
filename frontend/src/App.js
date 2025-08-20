@@ -221,23 +221,23 @@ const HomeView = ({ pools, selectedPool, setSelectedPool, setCurrentView, onDele
                       : 'border-gray-200 hover:border-blue-300'
                   }`}
                 >
-                  <div 
-                    className="cursor-pointer"
-                    onClick={() => setSelectedPool(pool)}
-                  >
-                    <h4 className="font-semibold">{pool.name}</h4>
-                    <p className="text-sm text-gray-600">
-                      {pool.volume_liters.toLocaleString()} L ({pool.volume_gallons.toLocaleString()} gal)
-                    </p>
-                  </div>
-                  <div className="mt-2 flex justify-end">
+                  <div className="flex justify-between items-start">
+                    <div 
+                      className="cursor-pointer flex-1"
+                      onClick={() => setSelectedPool(pool)}
+                    >
+                      <h4 className="font-semibold">{pool.name}</h4>
+                      <p className="text-sm text-gray-600">
+                        {pool.volume_liters.toLocaleString()} L ({pool.volume_gallons.toLocaleString()} gal)
+                      </p>
+                    </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation(); // Evitar que se seleccione la piscina al hacer clic en eliminar
                         onDeletePool(pool.id);
                       }}
                       disabled={loading}
-                      className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-md transition-colors disabled:opacity-50"
+                      className="ml-2 bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-800 p-2 rounded-md transition-colors disabled:opacity-50 flex items-center justify-center min-w-[36px] h-9"
                       title="Eliminar piscina"
                     >
                       🗑️
