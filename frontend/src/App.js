@@ -448,7 +448,7 @@ const ChlorineCalculator = ({ pool, onCalculate, loading }) => {
   const [values, setValues] = useState({
     current_value: '',
     target_value: '2.0',
-    product_type: 'hipoclorito_sodio',
+    product_type: '',
     product_concentration: ''
   });
   const [result, setResult] = useState(null);
