@@ -276,10 +276,19 @@ def calculate_alkalinity(request: CalculationRequest):
 
     alk_increase = target_alk - current_alk
 
-    # Factor for alkalinity increase (grams per 1000L per 10ppm)
-    factor = 17.0 if product_type == "bicarbonato_sodio" else 15.0
+    # Standard alkalinity calculation: 1.5 lbs per 10,000 gallons increases alkalinity by 10 ppm
+    # 1.5 lbs = 680 grams
+    volume_gallons = volume_liters * 0.264172
+    
+    if product_type == "bicarbonato_sodio":
+        # Sodium bicarbonate: 1.5 lbs (680g) per 10,000 gal for 10 ppm increase
+        factor_per_10k_gal_per_10ppm = 680.0
+    else:  # "aumentador_alcalinidad" - commercial alkalinity increaser
+        # Commercial products are typically more concentrated, use ~85% efficiency
+        factor_per_10k_gal_per_10ppm = 580.0
 
-    amount = (volume_liters / 1000) * (alk_increase / 10) * factor
+    # Calculate amount: (volume_gallons / 10000) * (alk_increase / 10) * factor
+    amount = (volume_gallons / 10000) * (alk_increase / 10) * factor_per_10k_gal_per_10ppm
 
     unit = "g"
 
@@ -299,7 +308,9 @@ def calculate_alkalinity(request: CalculationRequest):
             "current": current_alk,
             "target": target_alk,
             "increase": alk_increase,
-            "volume": volume_liters
+            "volume_liters": volume_liters,
+            "volume_gallons": round(volume_gallons, 2),
+            "formula_used": f"Pool standard: ({round(volume_gallons,0)}/10000) * ({alk_increase}/10) * {factor_per_10k_gal_per_10ppm}g"
         }
     )
 
