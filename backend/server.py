@@ -205,27 +205,40 @@ def calculate_ph(request: CalculationRequest):
 
     ph_change = target_ph - current_ph
 
-    # Calculation factors based on product type and direction
+    # Improved calculation factors based on standard pool chemistry
+    # These factors are grams or ml per 10,000 gallons to change pH by 0.2 units
     if ph_change > 0:  # Increase pH
         if product_type == "carbonato_sodio":
-            factor = 6.0  # grams per 1000L per 0.1 pH unit
+            # Sodium carbonate (soda ash): ~6 oz (170g) per 10,000 gal for 0.2 pH increase
+            factor_per_10k_gal = 170.0  # grams per 10,000 gallons for 0.2 pH increase
         else:
-            factor = 6.0
+            factor_per_10k_gal = 170.0
     else:  # Decrease pH
         if product_type == "acido_muriatico":
-            factor = 4.0  # ml per 1000L per 0.1 pH unit
+            # Muriatic acid: ~1 qt (946ml) per 10,000 gal for 0.2 pH decrease
+            factor_per_10k_gal = 946.0  # ml per 10,000 gallons for 0.2 pH decrease
         elif product_type == "bisulfato_sodio":
-            factor = 8.0  # grams per 1000L per 0.1 pH unit
+            # Sodium bisulfate: ~1.5 lbs (680g) per 10,000 gal for 0.2 pH decrease
+            factor_per_10k_gal = 680.0  # grams per 10,000 gallons for 0.2 pH decrease
         else:
-            factor = 6.0
+            factor_per_10k_gal = 680.0
 
-    amount = abs((volume_liters / 1000) * (abs(ph_change) / 0.1) * factor)
+    # Convert volume to gallons for calculation
+    volume_gallons = volume_liters * 0.264172
+    
+    # Calculate amount based on standard pool chemistry formulas
+    # Formula: (volume_gallons / 10000) * (ph_change / 0.2) * factor
+    amount = (volume_gallons / 10000) * (abs(ph_change) / 0.2) * factor_per_10k_gal
 
     unit = "ml" if product_type == "acido_muriatico" else "g"
 
+    # Convert to larger units if needed
     if unit == "g" and amount > 1000:
         amount = round(amount / 1000, 2)
         unit = "kg"
+    elif unit == "ml" and amount > 1000:
+        amount = round(amount / 1000, 2)
+        unit = "L"
     else:
         amount = round(amount, 2)
 
@@ -240,7 +253,9 @@ def calculate_ph(request: CalculationRequest):
             "current": current_ph,
             "target": target_ph,
             "change": ph_change,
-            "volume": volume_liters
+            "volume_liters": volume_liters,
+            "volume_gallons": round(volume_gallons, 2),
+            "formula_used": f"Pool standard: ({round(volume_gallons,0)}/10000) * ({abs(ph_change)}/0.2) * {factor_per_10k_gal}"
         }
     )
 
