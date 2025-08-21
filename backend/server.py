@@ -123,12 +123,22 @@ def calculate_chlorine(request: CalculationRequest):
     current_ppm = request.current_value
     target_ppm = request.target_value
     product_type = request.product_type
-    concentration = request.product_concentration or 6  # default 6%
+    
+    # Set default concentrations based on product type
+    default_concentrations = {
+        "hipoclorito_sodio": 10.0,  # Typical household bleach 10-12%
+        "hipoclorito_calcio": 65.0,  # Cal-Hypo 65-70%
+        "dicloro_granulado": 56.0,   # Dichlor 56%
+        "tricloro_granulado": 90.0,  # Trichlor 90%
+        "tricloro_pastillas": 90.0   # Trichlor tablets 90%
+    }
+    
+    concentration = request.product_concentration or default_concentrations.get(product_type, 10.0)
 
     if target_ppm <= current_ppm:
         return CalculationResult(
             amount=0,
-            unit="ml",
+            unit="ml" if product_type == "hipoclorito_sodio" else "g",
             notes="El nivel actual ya está en o por encima del objetivo",
             calculation_details={
                 "current": current_ppm,
@@ -139,27 +149,28 @@ def calculate_chlorine(request: CalculationRequest):
 
     ppm_increase = target_ppm - current_ppm
 
-    # Calculation factors based on product type
-    factors = {
-        "hipoclorito_sodio": 1.5,  # liquid bleach factor
-        "hipoclorito_calcio": 1.2,  # cal-hypo factor
-        "dicloro_granulado": 1.1,  # dichlor factor
-        "tricloro_granulado": 1.0,  # trichlor factor
-        "tricloro_pastillas": 1.0  # trichlor tablets factor
-    }
+    # Corrected formula: (ppm_increase * volume_liters) / (1000 * concentration_decimal)
+    # This is the standard pool chemical calculation formula
+    concentration_decimal = concentration / 100
+    amount = (ppm_increase * volume_liters) / (1000 * concentration_decimal)
 
-    factor = factors.get(product_type, 1.5)
-
-    # Basic formula: (volume_liters * ppm_increase * factor) / (concentration / 100)
-    amount = (volume_liters * ppm_increase * factor) / (concentration / 100)
-
-    unit = "ml" if product_type == "hipoclorito_sodio" else "g"
-
-    if unit == "g" and amount > 1000:
-        amount = round(amount / 1000, 2)
-        unit = "kg"
+    # Unit selection and conversion
+    if product_type == "hipoclorito_sodio":
+        unit = "ml"
+        # Convert to liters if amount is large
+        if amount > 1000:
+            amount = round(amount / 1000, 2)
+            unit = "L"
+        else:
+            amount = round(amount, 2)
     else:
-        amount = round(amount, 2)
+        unit = "g"
+        # Convert to kg if amount is large
+        if amount > 1000:
+            amount = round(amount / 1000, 2)
+            unit = "kg"
+        else:
+            amount = round(amount, 2)
 
     notes = f"Agregar {amount} {unit} de {get_product_name(product_type)}"
 
@@ -172,7 +183,8 @@ def calculate_chlorine(request: CalculationRequest):
             "target": target_ppm,
             "increase": ppm_increase,
             "volume": volume_liters,
-            "concentration": concentration
+            "concentration": concentration,
+            "formula_used": "Standard pool chemical formula: (ppm_increase * volume_L) / (1000 * concentration_decimal)"
         }
     )
 
