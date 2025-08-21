@@ -123,12 +123,22 @@ def calculate_chlorine(request: CalculationRequest):
     current_ppm = request.current_value
     target_ppm = request.target_value
     product_type = request.product_type
-    concentration = request.product_concentration or 6  # default 6%
     
+    # Set default concentrations based on product type
+    default_concentrations = {
+        "hipoclorito_sodio": 10.0,  # Typical household bleach 10-12%
+        "hipoclorito_calcio": 65.0,  # Cal-Hypo 65-70%
+        "dicloro_granulado": 56.0,   # Dichlor 56%
+        "tricloro_granulado": 90.0,  # Trichlor 90%
+        "tricloro_pastillas": 90.0   # Trichlor tablets 90%
+    }
+    
+    concentration = request.product_concentration or default_concentrations.get(product_type, 10.0)
+
     if target_ppm <= current_ppm:
         return CalculationResult(
             amount=0,
-            unit="ml",
+            unit="ml" if product_type == "hipoclorito_sodio" else "g",
             notes="El nivel actual ya está en o por encima del objetivo",
             calculation_details={
                 "current": current_ppm,
@@ -136,33 +146,34 @@ def calculate_chlorine(request: CalculationRequest):
                 "difference": 0
             }
         )
-    
+
     ppm_increase = target_ppm - current_ppm
-    
-    # Calculation factors based on product type
-    factors = {
-        "hipoclorito_sodio": 1.5,  # liquid bleach factor
-        "hipoclorito_calcio": 1.2,  # cal-hypo factor
-        "dicloro_granulado": 1.1,   # dichlor factor
-        "tricloro_granulado": 1.0,  # trichlor factor
-        "tricloro_pastillas": 1.0   # trichlor tablets factor
-    }
-    
-    factor = factors.get(product_type, 1.5)
-    
-    # Basic formula: (volume_liters * ppm_increase * factor) / (concentration / 100)
-    amount = (volume_liters * ppm_increase * factor) / (concentration / 100)
-    
-    unit = "ml" if product_type == "hipoclorito_sodio" else "g"
-    
-    if unit == "g" and amount > 1000:
-        amount = round(amount / 1000, 2)
-        unit = "kg"
+
+    # Corrected formula: (ppm_increase * volume_liters) / (1000 * concentration_decimal)
+    # This is the standard pool chemical calculation formula
+    concentration_decimal = concentration / 100
+    amount = (ppm_increase * volume_liters) / (1000 * concentration_decimal)
+
+    # Unit selection and conversion
+    if product_type == "hipoclorito_sodio":
+        unit = "ml"
+        # Convert to liters if amount is large
+        if amount > 1000:
+            amount = round(amount / 1000, 2)
+            unit = "L"
+        else:
+            amount = round(amount, 2)
     else:
-        amount = round(amount, 2)
-    
+        unit = "g"
+        # Convert to kg if amount is large
+        if amount > 1000:
+            amount = round(amount / 1000, 2)
+            unit = "kg"
+        else:
+            amount = round(amount, 2)
+
     notes = f"Agregar {amount} {unit} de {get_product_name(product_type)}"
-    
+
     return CalculationResult(
         amount=amount,
         unit=unit,
@@ -172,7 +183,8 @@ def calculate_chlorine(request: CalculationRequest):
             "target": target_ppm,
             "increase": ppm_increase,
             "volume": volume_liters,
-            "concentration": concentration
+            "concentration": concentration,
+            "formula_used": "Standard pool chemical formula: (ppm_increase * volume_L) / (1000 * concentration_decimal)"
         }
     )
 
@@ -182,7 +194,7 @@ def calculate_ph(request: CalculationRequest):
     current_ph = request.current_value
     target_ph = request.target_value
     product_type = request.product_type
-    
+
     if abs(target_ph - current_ph) < 0.1:
         return CalculationResult(
             amount=0,
@@ -190,36 +202,49 @@ def calculate_ph(request: CalculationRequest):
             notes="El pH ya está en el rango objetivo",
             calculation_details={"current": current_ph, "target": target_ph}
         )
-    
+
     ph_change = target_ph - current_ph
-    
-    # Calculation factors based on product type and direction
+
+    # Improved calculation factors based on standard pool chemistry
+    # These factors are grams or ml per 10,000 gallons to change pH by 0.2 units
     if ph_change > 0:  # Increase pH
         if product_type == "carbonato_sodio":
-            factor = 6.0  # grams per 1000L per 0.1 pH unit
+            # Sodium carbonate (soda ash): ~6 oz (170g) per 10,000 gal for 0.2 pH increase
+            factor_per_10k_gal = 170.0  # grams per 10,000 gallons for 0.2 pH increase
         else:
-            factor = 6.0
+            factor_per_10k_gal = 170.0
     else:  # Decrease pH
         if product_type == "acido_muriatico":
-            factor = 4.0  # ml per 1000L per 0.1 pH unit
+            # Muriatic acid: ~1 qt (946ml) per 10,000 gal for 0.2 pH decrease
+            factor_per_10k_gal = 946.0  # ml per 10,000 gallons for 0.2 pH decrease
         elif product_type == "bisulfato_sodio":
-            factor = 8.0  # grams per 1000L per 0.1 pH unit
+            # Sodium bisulfate: ~1.5 lbs (680g) per 10,000 gal for 0.2 pH decrease
+            factor_per_10k_gal = 680.0  # grams per 10,000 gallons for 0.2 pH decrease
         else:
-            factor = 6.0
+            factor_per_10k_gal = 680.0
+
+    # Convert volume to gallons for calculation
+    volume_gallons = volume_liters * 0.264172
     
-    amount = abs((volume_liters / 1000) * (abs(ph_change) / 0.1) * factor)
-    
+    # Calculate amount based on standard pool chemistry formulas
+    # Formula: (volume_gallons / 10000) * (ph_change / 0.2) * factor
+    amount = (volume_gallons / 10000) * (abs(ph_change) / 0.2) * factor_per_10k_gal
+
     unit = "ml" if product_type == "acido_muriatico" else "g"
-    
+
+    # Convert to larger units if needed
     if unit == "g" and amount > 1000:
         amount = round(amount / 1000, 2)
         unit = "kg"
+    elif unit == "ml" and amount > 1000:
+        amount = round(amount / 1000, 2)
+        unit = "L"
     else:
         amount = round(amount, 2)
-    
+
     action = "subir" if ph_change > 0 else "bajar"
     notes = f"Agregar {amount} {unit} de {get_product_name(product_type)} para {action} el pH"
-    
+
     return CalculationResult(
         amount=amount,
         unit=unit,
@@ -228,7 +253,9 @@ def calculate_ph(request: CalculationRequest):
             "current": current_ph,
             "target": target_ph,
             "change": ph_change,
-            "volume": volume_liters
+            "volume_liters": volume_liters,
+            "volume_gallons": round(volume_gallons, 2),
+            "formula_used": f"Pool standard: ({round(volume_gallons,0)}/10000) * ({abs(ph_change)}/0.2) * {factor_per_10k_gal}"
         }
     )
 
@@ -238,7 +265,7 @@ def calculate_alkalinity(request: CalculationRequest):
     current_alk = request.current_value
     target_alk = request.target_value
     product_type = request.product_type
-    
+
     if target_alk <= current_alk:
         return CalculationResult(
             amount=0,
@@ -246,23 +273,33 @@ def calculate_alkalinity(request: CalculationRequest):
             notes="La alcalinidad actual ya está en o por encima del objetivo",
             calculation_details={"current": current_alk, "target": target_alk}
         )
-    
+
     alk_increase = target_alk - current_alk
+
+    # Standard alkalinity calculation: 1.5 lbs per 10,000 gallons increases alkalinity by 10 ppm
+    # 1.5 lbs = 680 grams
+    volume_gallons = volume_liters * 0.264172
     
-    # Factor for alkalinity increase (grams per 1000L per 10ppm)
-    factor = 17.0 if product_type == "bicarbonato_sodio" else 15.0
-    
-    amount = (volume_liters / 1000) * (alk_increase / 10) * factor
-    
+    if product_type == "bicarbonato_sodio":
+        # Sodium bicarbonate: 1.5 lbs (680g) per 10,000 gal for 10 ppm increase
+        factor_per_10k_gal_per_10ppm = 680.0
+    else:  # "aumentador_alcalinidad" - commercial alkalinity increaser
+        # Commercial products are typically more concentrated, use ~85% efficiency
+        factor_per_10k_gal_per_10ppm = 580.0
+
+    # Calculate amount: (volume_gallons / 10000) * (alk_increase / 10) * factor
+    amount = (volume_gallons / 10000) * (alk_increase / 10) * factor_per_10k_gal_per_10ppm
+
     unit = "g"
+
     if amount > 1000:
         amount = round(amount / 1000, 2)
         unit = "kg"
     else:
         amount = round(amount, 2)
-    
+
     notes = f"Agregar {amount} {unit} de {get_product_name(product_type)}"
-    
+
     return CalculationResult(
         amount=amount,
         unit=unit,
@@ -271,7 +308,9 @@ def calculate_alkalinity(request: CalculationRequest):
             "current": current_alk,
             "target": target_alk,
             "increase": alk_increase,
-            "volume": volume_liters
+            "volume_liters": volume_liters,
+            "volume_gallons": round(volume_gallons, 2),
+            "formula_used": f"Pool standard: ({round(volume_gallons,0)}/10000) * ({alk_increase}/10) * {factor_per_10k_gal_per_10ppm}g"
         }
     )
 
@@ -281,9 +320,9 @@ def calculate_cyanuric_acid(request: CalculationRequest):
     current_cya = request.current_value
     target_cya = request.target_value
     product_type = request.product_type
-    
+
     cya_change = target_cya - current_cya
-    
+
     if product_type == "dilucion_agua":
         if cya_change >= 0:
             return CalculationResult(
@@ -292,23 +331,53 @@ def calculate_cyanuric_acid(request: CalculationRequest):
                 notes="Para reducir CYA se requiere dilución. No se puede aumentar con este método.",
                 calculation_details={"current": current_cya, "target": target_cya}
             )
-        
-        # Calculate water replacement percentage needed
-        reduction_percentage = abs(cya_change) / current_cya
-        water_to_replace = volume_liters * reduction_percentage
-        
+
+        # Improved dilution calculation
+        # The relationship is: Final_CYA = Initial_CYA * (Volume_remaining / Total_volume)
+        # Solving for water to replace: Volume_to_replace = Total_volume * (1 - Final_CYA/Initial_CYA)
+        if current_cya == 0:
+            return CalculationResult(
+                amount=0,
+                unit="L",
+                notes="No se puede calcular dilución cuando el CYA actual es 0",
+                calculation_details={"current": current_cya, "target": target_cya}
+            )
+
+        # Calculate replacement percentage
+        replacement_ratio = 1 - (target_cya / current_cya)
+        water_to_replace = volume_liters * replacement_ratio
+
+        # Safety check - don't recommend replacing more than 50% at once
+        if replacement_ratio > 0.5:
+            water_to_replace = volume_liters * 0.5
+            new_cya_after_50_percent = current_cya * 0.5
+            
+            return CalculationResult(
+                amount=round(water_to_replace, 2),
+                unit="L",
+                notes=f"Se recomienda reemplazar máximo 50% del agua por seguridad. Esto reducirá el CYA a ~{round(new_cya_after_50_percent, 1)} ppm. Repita el proceso si es necesario.",
+                calculation_details={
+                    "current": current_cya,
+                    "target": target_cya,
+                    "replacement_percentage": 50,
+                    "volume": volume_liters,
+                    "expected_cya_after": round(new_cya_after_50_percent, 1)
+                }
+            )
+
         return CalculationResult(
             amount=round(water_to_replace, 2),
             unit="L",
-            notes=f"Reemplazar {round(water_to_replace, 2)} L de agua (aprox {round(reduction_percentage * 100, 1)}% del volumen total)",
+            notes=f"Reemplazar {round(water_to_replace, 2)} L de agua (aprox {round(replacement_ratio * 100, 1)}% del volumen total)",
             calculation_details={
                 "current": current_cya,
                 "target": target_cya,
-                "reduction_needed": abs(cya_change),
+                "replacement_percentage": round(replacement_ratio * 100, 1),
                 "volume": volume_liters,
-                "replacement_percentage": reduction_percentage
+                "formula_used": f"CYA_final = CYA_inicial * (1 - replacement_ratio)"
             }
         )
+
     else:  # acido_cianurico
         if cya_change <= 0:
             return CalculationResult(
@@ -317,21 +386,27 @@ def calculate_cyanuric_acid(request: CalculationRequest):
                 notes="El CYA actual ya está en o por encima del objetivo",
                 calculation_details={"current": current_cya, "target": target_cya}
             )
+
+        # Standard CYA calculation: 1 lb per 10,000 gallons increases CYA by ~13 ppm
+        # 1 lb = 454 grams
+        volume_gallons = volume_liters * 0.264172
         
-        # Factor for CYA increase (grams per 1000L per 10ppm)
-        factor = 13.0
+        # Factor: 454g per 10,000 gal for 13 ppm increase
+        factor_per_10k_gal_per_13ppm = 454.0
         
-        amount = (volume_liters / 1000) * (cya_change / 10) * factor
-        
+        # Calculate amount: (volume_gallons / 10000) * (cya_change / 13) * 454g
+        amount = (volume_gallons / 10000) * (cya_change / 13) * factor_per_10k_gal_per_13ppm
+
         unit = "g"
+
         if amount > 1000:
             amount = round(amount / 1000, 2)
             unit = "kg"
         else:
             amount = round(amount, 2)
-        
+
         notes = f"Agregar {amount} {unit} de ácido cianúrico granulado"
-        
+
         return CalculationResult(
             amount=amount,
             unit=unit,
@@ -340,7 +415,9 @@ def calculate_cyanuric_acid(request: CalculationRequest):
                 "current": current_cya,
                 "target": target_cya,
                 "increase": cya_change,
-                "volume": volume_liters
+                "volume_liters": volume_liters,
+                "volume_gallons": round(volume_gallons, 2),
+                "formula_used": f"Pool standard: ({round(volume_gallons,0)}/10000) * ({cya_change}/13) * 454g"
             }
         )
 
