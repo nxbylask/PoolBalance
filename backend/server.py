@@ -332,20 +332,49 @@ def calculate_cyanuric_acid(request: CalculationRequest):
                 calculation_details={"current": current_cya, "target": target_cya}
             )
 
-        # Calculate water replacement percentage needed
-        reduction_percentage = abs(cya_change) / current_cya
-        water_to_replace = volume_liters * reduction_percentage
+        # Improved dilution calculation
+        # The relationship is: Final_CYA = Initial_CYA * (Volume_remaining / Total_volume)
+        # Solving for water to replace: Volume_to_replace = Total_volume * (1 - Final_CYA/Initial_CYA)
+        if current_cya == 0:
+            return CalculationResult(
+                amount=0,
+                unit="L",
+                notes="No se puede calcular dilución cuando el CYA actual es 0",
+                calculation_details={"current": current_cya, "target": target_cya}
+            )
+
+        # Calculate replacement percentage
+        replacement_ratio = 1 - (target_cya / current_cya)
+        water_to_replace = volume_liters * replacement_ratio
+
+        # Safety check - don't recommend replacing more than 50% at once
+        if replacement_ratio > 0.5:
+            water_to_replace = volume_liters * 0.5
+            new_cya_after_50_percent = current_cya * 0.5
+            
+            return CalculationResult(
+                amount=round(water_to_replace, 2),
+                unit="L",
+                notes=f"Se recomienda reemplazar máximo 50% del agua por seguridad. Esto reducirá el CYA a ~{round(new_cya_after_50_percent, 1)} ppm. Repita el proceso si es necesario.",
+                calculation_details={
+                    "current": current_cya,
+                    "target": target_cya,
+                    "replacement_percentage": 50,
+                    "volume": volume_liters,
+                    "expected_cya_after": round(new_cya_after_50_percent, 1)
+                }
+            )
 
         return CalculationResult(
             amount=round(water_to_replace, 2),
             unit="L",
-            notes=f"Reemplazar {round(water_to_replace, 2)} L de agua (aprox {round(reduction_percentage * 100, 1)}% del volumen total)",
+            notes=f"Reemplazar {round(water_to_replace, 2)} L de agua (aprox {round(replacement_ratio * 100, 1)}% del volumen total)",
             calculation_details={
                 "current": current_cya,
                 "target": target_cya,
-                "reduction_needed": abs(cya_change),
+                "replacement_percentage": round(replacement_ratio * 100, 1),
                 "volume": volume_liters,
-                "replacement_percentage": reduction_percentage
+                "formula_used": f"CYA_final = CYA_inicial * (1 - replacement_ratio)"
             }
         )
 
@@ -358,10 +387,15 @@ def calculate_cyanuric_acid(request: CalculationRequest):
                 calculation_details={"current": current_cya, "target": target_cya}
             )
 
-        # Factor for CYA increase (grams per 1000L per 10ppm)
-        factor = 13.0
-
-        amount = (volume_liters / 1000) * (cya_change / 10) * factor
+        # Standard CYA calculation: 1 lb per 10,000 gallons increases CYA by ~13 ppm
+        # 1 lb = 454 grams
+        volume_gallons = volume_liters * 0.264172
+        
+        # Factor: 454g per 10,000 gal for 13 ppm increase
+        factor_per_10k_gal_per_13ppm = 454.0
+        
+        # Calculate amount: (volume_gallons / 10000) * (cya_change / 13) * 454g
+        amount = (volume_gallons / 10000) * (cya_change / 13) * factor_per_10k_gal_per_13ppm
 
         unit = "g"
 
@@ -381,7 +415,9 @@ def calculate_cyanuric_acid(request: CalculationRequest):
                 "current": current_cya,
                 "target": target_cya,
                 "increase": cya_change,
-                "volume": volume_liters
+                "volume_liters": volume_liters,
+                "volume_gallons": round(volume_gallons, 2),
+                "formula_used": f"Pool standard: ({round(volume_gallons,0)}/10000) * ({cya_change}/13) * 454g"
             }
         )
 
