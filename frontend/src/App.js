@@ -94,7 +94,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-100">
       <Header currentView={currentView} setCurrentView={setCurrentView} />
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 mt-[70px]">
         {currentView === 'home' && (
           <HomeView
             pools={pools}
@@ -146,7 +146,7 @@ function App() {
 
 const Header = ({ currentView, setCurrentView }) => {
   return (
-    <header className="bg-blue-600 text-white shadow-lg">
+    <header className="bg-blue-600 text-white shadow-lg fixed top-0 left-0 w-full z-50">
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between">
           <h1
@@ -155,23 +155,14 @@ const Header = ({ currentView, setCurrentView }) => {
           >
             🏊‍♂️ Pool Balance
           </h1>
-          <nav className="flex space-x-4">
+          <nav className="flex space-x-2">
             <button
               onClick={() => setCurrentView('home')}
-              className={`px-4 py-2 rounded-md transition-colors ${
+              className={`px-3 py-2 rounded-md transition-colors ${
                 currentView === 'home' ? 'bg-blue-700' : 'hover:bg-blue-500'
               }`}
             >
               Inicio
-            </button>
-            <button
-              onClick={() => setCurrentView('calculator')}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                currentView.includes('calculator') || ['chlorine', 'ph', 'alkalinity', 'cyanuric-acid'].includes(currentView)
-                  ? 'bg-blue-700' : 'hover:bg-blue-500'
-              }`}
-            >
-              Calculadoras
             </button>
           </nav>
         </div>
